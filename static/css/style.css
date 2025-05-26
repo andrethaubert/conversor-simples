@@ -295,3 +295,41 @@ code {
         height: 40px;
     }
 }
+
+
+/* Estilos para os cartões de seleção de seções */
+.section-card {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.section-card.section-color-1 { border-left: 5px solid #0470AB; }
+.section-card.section-color-2 { border-left: 5px solid #F6520C; }
+.section-card.section-color-3 { border-left: 5px solid #0A8754; }
+.section-card.section-color-4 { border-left: 5px solid #9C27B0; }
+.section-card.section-color-5 { border-left: 5px solid #E91E63; }
+.section-card.section-color-6 { border-left: 5px solid #FF9800; }
+
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.form-switch .form-check-input {
+    width: 3em;
+    height: 1.5em;
+    margin-right: 10px;
+}
+
+.form-check-label {
+    font-weight: 600;
+    font-size: 1.1rem;
+}

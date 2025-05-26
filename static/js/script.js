@@ -4,12 +4,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputs = document.querySelectorAll('input[type="text"]');
     inputs.forEach(input => {
         input.addEventListener('blur', function() {
-            if (this.value.trim() === '') {
-                this.classList.add('is-invalid');
-                this.classList.remove('is-valid');
-            } else {
+            if (this.value.trim() !== '') {
                 this.classList.remove('is-invalid');
                 this.classList.add('is-valid');
+            } else {
+                // Remover ambas as classes para campos vazios
+                this.classList.remove('is-invalid');
+                this.classList.remove('is-valid');
             }
         });
         
@@ -75,3 +76,63 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+
+// Adicionar interatividade aos cartões de seleção de seções
+document.addEventListener('DOMContentLoaded', function() {
+    // Tornar o cartão inteiro clicável para selecionar/desselecionar a seção
+    const sectionCards = document.querySelectorAll('.section-card');
+    sectionCards.forEach(card => {
+        card.addEventListener('click', function(e) {
+            // Evitar clique duplo se o usuário clicar diretamente no checkbox
+            if (e.target.type !== 'checkbox') {
+                const checkbox = this.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                
+                // Atualizar aparência do cartão
+                if (checkbox.checked) {
+                    this.classList.add('selected-section');
+                } else {
+                    this.classList.remove('selected-section');
+                }
+            }
+        });
+        
+        // Verificar estado inicial
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        if (checkbox.checked) {
+            card.classList.add('selected-section');
+        }
+    });
+    
+    // Atualizar aparência quando o checkbox é alterado diretamente
+    const checkboxes = document.querySelectorAll('.section-card input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const card = this.closest('.section-card');
+            if (this.checked) {
+                card.classList.add('selected-section');
+            } else {
+                card.classList.remove('selected-section');
+            }
+        });
+    });
+});
+
+// Adicionar estilo para seções selecionadas
+const styleSection = document.createElement('style');
+styleSection.textContent = `
+    .selected-section {
+        border: 2px solid var(--primary-color);
+        background-color: rgba(4, 112, 171, 0.05);
+    }
+    
+    .section-card {
+        position: relative;
+    }
+    
+    .section-card .form-check {
+        margin-bottom: 10px;
+    }
+`;
+document.head.appendChild(styleSection);

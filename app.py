@@ -10,7 +10,7 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'output'
 app.config['ALLOWED_EXTENSIONS'] = {'docx'}
 
-# Criar pastas se não existirem
+
 for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -89,6 +89,37 @@ def upload_template():
     
     return redirect(request.url)
 
+@app.route('/selecionar_secoes', methods=['GET', 'POST'])
+def selecionar_secoes():
+    if request.method == 'POST':
+        template_name = request.form.get('template_name')
+        secoes_selecionadas = request.form.getlist('secoes_selecionadas')
+        
+        # Obter as seções e campos do template
+        template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
+        doc = DocxTemplate(template_path)
+        campos = doc.get_undeclared_template_variables()
+        secoes = organizar_campos_por_secao(campos)
+        
+        return render_template('index.html', 
+                              template_name=template_name,
+                              secoes=secoes,
+                              secoes_selecionadas=secoes_selecionadas)
+    else:
+        template_name = request.args.get('template_name')
+        if not template_name:
+            return redirect(url_for('index'))
+        
+        # Obter as seções e campos do template
+        template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
+        doc = DocxTemplate(template_path)
+        campos = doc.get_undeclared_template_variables()
+        secoes = organizar_campos_por_secao(campos)
+        
+        return render_template('index.html', 
+                              template_name=template_name,
+                              secoes=secoes)
+
 @app.route('/generate', methods=['POST'])
 def generate_document():
     template_name = request.form.get('template_name')
@@ -99,11 +130,19 @@ def generate_document():
     context = {}
     for key, value in request.form.items():
         if key != 'template_name':
-            context[key] = value
+            # Tente converter valores numéricos para float
+            if value.replace('.', '', 1).isdigit():
+                try:
+                    context[key] = float(value)
+                except ValueError:
+                    context[key] = value
+            else:
+                context[key] = value
     
     # Gerar documento
     template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
     doc = DocxTemplate(template_path)
+    
     doc.render(context)
     
     output_filename = f"preenchido_{template_name}"

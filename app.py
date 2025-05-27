@@ -4,6 +4,9 @@ import os
 import json
 import re
 from werkzeug.utils import secure_filename
+import zipfile
+import xml.etree.ElementTree as ET
+from collections import OrderedDict
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -23,8 +26,9 @@ def index():
     return render_template('index.html')
 
 def organizar_campos_por_secao(campos):
-    """Organiza os campos em seções com base em prefixos ou padrões."""
+    """Organiza os campos em seções com base em prefixos ou padrões, preservando a ordem original."""
     secoes = {}
+    secoes_ordem = []  # Lista para manter a ordem das seções
     
     # Padrão para identificar seções nos nomes dos campos
     # Exemplo: dados_projeto_nome, dados_cliente_email, etc.
@@ -39,6 +43,7 @@ def organizar_campos_por_secao(campos):
             
             if secao not in secoes:
                 secoes[secao] = []
+                secoes_ordem.append(secao)  # Registra a ordem em que a seção apareceu pela primeira vez
             
             secoes[secao].append({
                 'id': campo,
@@ -48,20 +53,62 @@ def organizar_campos_por_secao(campos):
             # Se não segue o padrão, colocar em "Outros"
             if "Outros" not in secoes:
                 secoes["Outros"] = []
+                secoes_ordem.append("Outros")  # Adiciona "Outros" à lista de ordem
             
             secoes["Outros"].append({
                 'id': campo,
                 'nome': campo.replace('_', ' ').title()
             })
     
-    # Formatar nomes das seções para exibição
+    # Formatar nomes das seções para exibição, preservando a ordem
     secoes_formatadas = {}
-    for secao, campos in secoes.items():
+    for secao in secoes_ordem:  # Usa a lista de ordem em vez de iterar pelo dicionário
         nome_secao = secao.replace('_', ' ').title()
-        secoes_formatadas[nome_secao] = campos
+        secoes_formatadas[nome_secao] = secoes[secao]
     
     return secoes_formatadas
 
+def extrair_campos_em_ordem(docx_path):
+    """Extrai campos do template na ordem em que aparecem no documento."""
+    campos_ordenados = []
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    
+    # Abrir o arquivo .docx como um arquivo zip
+    with zipfile.ZipFile(docx_path, 'r') as zip_ref:
+        # Extrair o conteúdo do documento principal
+        content = zip_ref.read('word/document.xml')
+        
+        # Analisar o XML
+        root = ET.fromstring(content)
+        
+        # Procurar por todos os elementos de texto no documento
+        for paragraph in root.findall('.//w:p', namespace):
+            text = ''
+            for run in paragraph.findall('.//w:r', namespace):
+                for t in run.findall('.//w:t', namespace):
+                    text += t.text if t.text else ''
+            
+            # Procurar por marcadores Jinja2 no texto
+            start_idx = 0
+            while True:
+                start_idx = text.find('{{', start_idx)
+                if start_idx == -1:
+                    break
+                    
+                end_idx = text.find('}}', start_idx)
+                if end_idx == -1:
+                    break
+                    
+                # Extrair o nome do campo
+                campo = text[start_idx+2:end_idx].strip()
+                if campo and campo not in campos_ordenados:
+                    campos_ordenados.append(campo)
+                    
+                start_idx = end_idx + 2
+    
+    return campos_ordenados
+
+# Modifique a função upload_template para usar a nova função
 @app.route('/upload', methods=['POST'])
 def upload_template():
     if 'template' not in request.files:
@@ -76,9 +123,13 @@ def upload_template():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         
-        # Extrair campos do template
-        doc = DocxTemplate(filepath)
-        campos = doc.get_undeclared_template_variables()
+        # Extrair campos do template na ordem em que aparecem
+        campos = extrair_campos_em_ordem(filepath)
+        
+        # Como backup, caso a extração falhe, use o método padrão
+        if not campos:
+            doc = DocxTemplate(filepath)
+            campos = list(doc.get_undeclared_template_variables())
         
         # Organizar campos em seções
         secoes = organizar_campos_por_secao(campos)
@@ -95,10 +146,15 @@ def selecionar_secoes():
         template_name = request.form.get('template_name')
         secoes_selecionadas = request.form.getlist('secoes_selecionadas')
         
-        # Obter as seções e campos do template
+        # Obter as seções e campos do template na ordem correta
         template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
-        doc = DocxTemplate(template_path)
-        campos = doc.get_undeclared_template_variables()
+        campos = extrair_campos_em_ordem(template_path)
+        
+        # Como backup, caso a extração falhe
+        if not campos:
+            doc = DocxTemplate(template_path)
+            campos = list(doc.get_undeclared_template_variables())
+            
         secoes = organizar_campos_por_secao(campos)
         
         return render_template('index.html', 
@@ -110,10 +166,15 @@ def selecionar_secoes():
         if not template_name:
             return redirect(url_for('index'))
         
-        # Obter as seções e campos do template
+        # Obter as seções e campos do template na ordem correta
         template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
-        doc = DocxTemplate(template_path)
-        campos = doc.get_undeclared_template_variables()
+        campos = extrair_campos_em_ordem(template_path)
+        
+        # Como backup, caso a extração falhe
+        if not campos:
+            doc = DocxTemplate(template_path)
+            campos = list(doc.get_undeclared_template_variables())
+            
         secoes = organizar_campos_por_secao(campos)
         
         return render_template('index.html', 
@@ -128,8 +189,15 @@ def generate_document():
     
     # Obter todos os campos do formulário
     context = {}
+    campos_dinamicos_dict = []  # Lista para campos dinâmicos
+    campos_dinamicos = request.form.getlist('campos_dinamicos[]')
+    
     for key, value in request.form.items():
-        if key != 'template_name':
+        if key != 'template_name' and key != 'campos_dinamicos[]':
+            # Processar nomes de campos dinâmicos
+            if key.startswith('dinamico_nome_'):
+                continue  # Pular, processaremos junto com os valores
+                
             # Tente converter valores numéricos para float
             if value.replace('.', '', 1).isdigit():
                 try:
@@ -138,6 +206,37 @@ def generate_document():
                     context[key] = value
             else:
                 context[key] = value
+    
+    # Processar campos dinâmicos
+    for campo_id in campos_dinamicos:
+        nome_campo_key = f'dinamico_nome_{campo_id}'
+        if nome_campo_key in request.form and campo_id in request.form:
+            nome_campo = request.form[nome_campo_key].strip()
+            valor_campo = request.form[campo_id]
+            
+            if nome_campo:  # Só adicionar se o nome não estiver vazio
+                # Criar item para o campo dinâmico
+                campo_item = {
+                    'nome': nome_campo,
+                    'valor': valor_campo
+                }
+                
+                # Converter valor numérico se aplicável
+                if valor_campo.replace('.', '', 1).isdigit():
+                    try:
+                        campo_item['valor'] = float(valor_campo)
+                    except ValueError:
+                        pass
+                
+                # Adicionar à lista de campos dinâmicos
+                campos_dinamicos_dict.append(campo_item)
+                
+                # Também adicionar ao contexto principal (para compatibilidade)
+                nome_campo_formatado = nome_campo.lower().replace(' ', '_')
+                context[nome_campo_formatado] = campo_item['valor']
+    
+    # Adicionar a lista de campos dinâmicos ao contexto
+    context['campos_dinamicos'] = campos_dinamicos_dict
     
     # Gerar documento
     template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)

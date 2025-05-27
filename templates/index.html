@@ -104,18 +104,28 @@
                                          class="accordion-collapse collapse {% if loop.index == 1 %}show{% endif %}" 
                                          aria-labelledby="heading{{ loop.index }}" 
                                          data-bs-parent="#accordionSections">
-                                        <div class="accordion-body">
-                                            <div class="row">
-                                                {% for campo in campos %}
-                                                <div class="col-md-6 mb-3">
-                                                    <label for="{{ campo.id }}" class="form-label">{{ campo.nome }}</label>
-                                                    <div class="input-group">
-                                                        <span class="input-group-text"><i class="bi bi-pencil-fill"></i></span>
-                                                        <input type="text" class="form-control" id="{{ campo.id }}" name="{{ campo.id }}">
-                                                    </div>
+                                        <!-- Dentro do accordion-body, após a div row com os campos existentes -->
+                                        <div class="row">
+                                            {% for campo in campos %}
+                                            <div class="col-md-6 mb-3">
+                                                <label for="{{ campo.id }}" class="form-label">{{ campo.nome }}</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text"><i class="bi bi-pencil-fill"></i></span>
+                                                    <input type="text" class="form-control" id="{{ campo.id }}" name="{{ campo.id }}">
                                                 </div>
-                                                {% endfor %}
                                             </div>
+                                            {% endfor %}
+                                        </div>
+                                        
+                                        <!-- Adicionar esta parte para campos dinâmicos -->
+                                        <div class="row" id="campos-dinamicos-{{ loop.index }}">
+                                            <!-- Campos dinâmicos serão adicionados aqui via JavaScript -->
+                                        </div>
+                                        
+                                        <div class="mt-3 mb-3">
+                                            <button type="button" class="btn btn-outline-primary btn-sm add-campo-btn" data-secao="{{ secao }}" data-secao-index="{{ loop.index }}">
+                                                <i class="bi bi-plus-circle me-2"></i>Adicionar Campo
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

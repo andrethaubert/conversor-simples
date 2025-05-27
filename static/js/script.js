@@ -136,3 +136,62 @@ styleSection.textContent = `
     }
 `;
 document.head.appendChild(styleSection);
+
+
+// Adicionar ao final do arquivo script.js
+
+// Gerenciamento de campos dinâmicos
+document.addEventListener('DOMContentLoaded', function() {
+    // Contador global para IDs únicos
+    let campoCounter = 1;
+    
+    // Adicionar event listeners para os botões de adicionar campo
+    const addCampoBtns = document.querySelectorAll('.add-campo-btn');
+    addCampoBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const secao = this.getAttribute('data-secao');
+            const secaoIndex = this.getAttribute('data-secao-index');
+            const camposDinamicosContainer = document.getElementById(`campos-dinamicos-${secaoIndex}`);
+            
+            // Criar ID único para o campo
+            const campoId = `${secao}_dinamico_${campoCounter}`;
+            campoCounter++;
+            
+            // Criar elementos HTML para o novo campo
+            const colDiv = document.createElement('div');
+            colDiv.className = 'col-md-6 mb-3 campo-dinamico';
+            
+            // Criar o HTML interno
+            colDiv.innerHTML = `
+                <div class="d-flex">
+                    <div class="flex-grow-1">
+                        <input type="text" class="form-control mb-2" 
+                               placeholder="Nome do Campo" 
+                               name="dinamico_nome_${campoId}">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-pencil-fill"></i></span>
+                            <input type="text" class="form-control" 
+                                   placeholder="Valor" 
+                                   id="${campoId}" 
+                                   name="${campoId}">
+                            <input type="hidden" name="campos_dinamicos[]" value="${campoId}">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-danger ms-2 remove-campo-btn" 
+                            style="height: 38px; align-self: flex-end;">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `;
+            
+            // Adicionar o novo campo ao container
+            camposDinamicosContainer.appendChild(colDiv);
+            
+            // Adicionar event listener para o botão de remover
+            const removeBtn = colDiv.querySelector('.remove-campo-btn');
+            removeBtn.addEventListener('click', function() {
+                colDiv.remove();
+            });
+        });
+    });
+});

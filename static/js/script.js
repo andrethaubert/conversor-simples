@@ -139,6 +139,22 @@ document.head.appendChild(styleSection);
 
 
 // Adicionar ao final do arquivo script.js
+// Adicionar ao final do arquivo script.js
+document.addEventListener('DOMContentLoaded', function() {
+    // Validar formulário antes do envio
+    const form = document.querySelector('form[action="/generate"]');
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            // Impedir que a tecla Enter envie o formulário
+            document.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        });
+    }
+});
 
 // Gerenciamento de campos dinâmicos
 document.addEventListener('DOMContentLoaded', function() {

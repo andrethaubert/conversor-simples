@@ -181,6 +181,14 @@ def selecionar_secoes():
                               template_name=template_name,
                               secoes=secoes)
 
+# Adicionar esta função antes de generate_document
+def sanitizar_valor(valor):
+    """Sanitiza valores para evitar erros de sintaxe Jinja2"""
+    if valor is None:
+        return ""
+    return str(valor).strip()
+
+# Modificar a parte de processamento de campos em generate_document
 @app.route('/generate', methods=['POST'])
 def generate_document():
     template_name = request.form.get('template_name')
@@ -198,6 +206,9 @@ def generate_document():
             if key.startswith('dinamico_nome_'):
                 continue  # Pular, processaremos junto com os valores
                 
+            # Sanitizar o valor
+            value = sanitizar_valor(value)
+            
             # Tente converter valores numéricos para float
             if value.replace('.', '', 1).isdigit():
                 try:
@@ -211,8 +222,8 @@ def generate_document():
     for campo_id in campos_dinamicos:
         nome_campo_key = f'dinamico_nome_{campo_id}'
         if nome_campo_key in request.form and campo_id in request.form:
-            nome_campo = request.form[nome_campo_key].strip()
-            valor_campo = request.form[campo_id]
+            nome_campo = sanitizar_valor(request.form[nome_campo_key])
+            valor_campo = sanitizar_valor(request.form[campo_id])
             
             if nome_campo:  # Só adicionar se o nome não estiver vazio
                 # Criar item para o campo dinâmico
@@ -242,7 +253,22 @@ def generate_document():
     template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
     doc = DocxTemplate(template_path)
     
-    doc.render(context)
+    try:
+        doc.render(context)
+    except AttributeError as e:
+        if "'Section' object has no attribute 'part'" in str(e):
+            print(f"Erro de seção no documento: {str(e)}")
+            return render_template('error.html', 
+                                  error="O documento contém seções complexas que não podem ser processadas. "
+                                        "Por favor, simplifique o documento removendo seções, cabeçalhos ou "
+                                        "rodapés complexos.", 
+                                  filename="")
+        else:
+            print(f"Erro ao renderizar: {str(e)}")
+            return render_template('error.html', error=str(e), filename="")
+    except Exception as e:
+        print(f"Erro ao renderizar: {str(e)}")
+        return render_template('error.html', error=str(e), filename="")
     
     output_filename = f"preenchido_{template_name}"
     output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)

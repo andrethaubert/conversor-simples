@@ -21,6 +21,17 @@
                         </div>
                     </div>
                     <div class="card-body">
+                        <!-- Formulário para download do arquivo redigido.docx -->
+                        <div class="alert alert-info mb-4">
+                            <h4 class="alert-heading"><i class="bi bi-file-earmark-word me-2"></i>Download do Orçamento Modelo</h4>
+                            <p>Você pode baixar o orçamento modelo clicando no botão abaixo:</p>
+                            <a href="{{ url_for('download_redigido') }}" class="btn btn-info">
+                                <i class="bi bi-download me-2"></i>Baixar Orçamento Modelo
+                            </a>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
                         {% if not template_name %}
                         <!-- Etapa 1: Upload do template -->
                         <h4><i class="bi bi-1-circle-fill me-2"></i>Faça upload do seu template Word</h4>
@@ -60,7 +71,22 @@
                                                     <span class="section-number">{{ loop.index }}</span> {{ secao }}
                                                 </label>
                                             </div>
-                                            <small class="text-muted">{{ campos|length }} campo(s)</small>
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    {% set total_campos = campos.campos|length %}
+                                                    {% set total_subsecoes = campos.subsecoes|length %}
+                                                    {{ total_campos }} campo(s) principal(is)
+                                                    {% if total_subsecoes > 0 %}
+                                                    <br>
+                                                    {{ total_subsecoes }} subseção(ões):
+                                                    <ul class="subsecao-list mt-1">
+                                                        {% for subsecao_nome, subsecao_campos in campos.subsecoes.items() %}
+                                                        <li>{{ subsecao_nome }} ({{ subsecao_campos|length }} campo(s))</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                    {% endif %}
+                                                </small>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -104,9 +130,9 @@
                                          class="accordion-collapse collapse {% if loop.index == 1 %}show{% endif %}" 
                                          aria-labelledby="heading{{ loop.index }}" 
                                          data-bs-parent="#accordionSections">
-                                        <!-- Dentro do accordion-body, após a div row com os campos existentes -->
+                                        <!-- Campos principais da seção -->
                                         <div class="row">
-                                            {% for campo in campos %}
+                                            {% for campo in campos.campos %}
                                             <div class="col-md-6 mb-3">
                                                 <label for="{{ campo.id }}" class="form-label">{{ campo.nome }}</label>
                                                 <div class="input-group">
@@ -116,6 +142,24 @@
                                             </div>
                                             {% endfor %}
                                         </div>
+                                        
+                                        <!-- Subseções -->
+                                        {% for subsecao_nome, subsecao_campos in campos.subsecoes.items() %}
+                                        <div class="subsecao-container mt-4 mb-3">
+                                            <h5 class="subsecao-titulo">{{ subsecao_nome }}</h5>
+                                            <div class="row">
+                                                {% for campo in subsecao_campos %}
+                                                <div class="col-md-6 mb-3">
+                                                    <label for="{{ campo.id }}" class="form-label">{{ campo.nome }}</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text"><i class="bi bi-pencil-fill"></i></span>
+                                                        <input type="text" class="form-control" id="{{ campo.id }}" name="{{ campo.id }}">
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
                                         
                                         <!-- Adicionar esta parte para campos dinâmicos -->
                                         <div class="row" id="campos-dinamicos-{{ loop.index }}">

@@ -318,6 +318,27 @@ code {
 .section-card.section-color-5 { border-left: 5px solid #E91E63; }
 .section-card.section-color-6 { border-left: 5px solid #FF9800; }
 
+/* Estilo para a lista de subseções na seleção */
+.subsecao-list {
+    list-style-type: none;
+    padding-left: 10px;
+    margin-top: 5px;
+    font-size: 0.85em;
+}
+
+.subsecao-list li {
+    margin-bottom: 3px;
+    position: relative;
+    padding-left: 12px;
+}
+
+.subsecao-list li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: var(--secondary-color);
+}
+
 .form-check-input:checked {
     background-color: var(--primary-color);
     border-color: var(--primary-color);
@@ -354,6 +375,59 @@ code {
 .add-campo-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilos para subseções */
+.subsecao-container {
+    border-left: 3px solid var(--secondary-color);
+    padding: 15px;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.subsecao-container:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.subsecao-titulo {
+    font-weight: 600;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--light-text);
+    position: relative;
+}
+
+.subsecao-titulo::before {
+    content: '';
+    position: absolute;
+    left: -15px;
+    top: 0;
+    height: 100%;
+    width: 3px;
+    background-color: var(--secondary-color);
+}
+
+/* Cores alternadas para subseções */
+.subsecao-container:nth-child(odd) {
+    border-left-color: var(--primary-color);
+}
+
+.subsecao-container:nth-child(odd) .subsecao-titulo::before {
+    background-color: var(--primary-color);
+}
+
+.subsecao-container:nth-child(even) {
+    border-left-color: var(--secondary-color);
+}
+
+.subsecao-container:nth-child(even) .subsecao-titulo::before {
+    background-color: var(--secondary-color);
 }
 
 @keyframes fadeIn {

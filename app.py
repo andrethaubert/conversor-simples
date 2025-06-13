@@ -26,45 +26,134 @@ def index():
     return render_template('index.html')
 
 def organizar_campos_por_secao(campos):
-    """Organiza os campos em seções com base em prefixos ou padrões, preservando a ordem original."""
+    """Organiza os campos em seções e subseções com base em prefixos ou padrões, preservando a ordem original."""
     secoes = {}
     secoes_ordem = []  # Lista para manter a ordem das seções
     
-    # Padrão para identificar seções nos nomes dos campos
-    # Exemplo: dados_projeto_nome, dados_cliente_email, etc.
-    padrao = r'^([a-zA-Z]+)_([a-zA-Z]+)_(.+)$'
+    # Imprimir campos para debug
+    print("Campos recebidos:", campos)
     
     for campo in campos:
-        match = re.match(padrao, campo)
-        if match:
-            # Se o campo segue o padrão, extrair a seção
-            secao = f"{match.group(1)}_{match.group(2)}"
-            nome_campo = match.group(3)
+        # Garantir que o campo não tenha espaços extras
+        campo_limpo = campo.strip()
+        print(f"Processando campo: '{campo_limpo}'")
+        
+        # Dividir o campo em partes usando underscore
+        partes = campo_limpo.split('_')
+        print(f"Partes do campo: {partes}")
+        
+        if len(partes) >= 3:
+            # Se temos pelo menos 3 partes (secao_subsecao_campo)
+            secao_principal = partes[0]
+            subsecao = partes[1]
+            nome_campo = '_'.join(partes[2:])  # Juntar o resto como nome do campo
             
-            if secao not in secoes:
-                secoes[secao] = []
-                secoes_ordem.append(secao)  # Registra a ordem em que a seção apareceu pela primeira vez
+            print(f"Partes encontradas: secao='{secao_principal}', subsecao='{subsecao}', campo='{nome_campo}'")
             
-            secoes[secao].append({
-                'id': campo,
+            # Verificar se a seção já existe
+            if secao_principal not in secoes:
+                secoes[secao_principal] = {
+                    'campos': [],
+                    'subsecoes': {}
+                }
+                secoes_ordem.append(secao_principal)  # Registra a ordem em que a seção apareceu pela primeira vez
+                print(f"Nova seção criada: '{secao_principal}'")
+            
+            # Adicionar à subseção apropriada
+            if subsecao not in secoes[secao_principal]['subsecoes']:
+                secoes[secao_principal]['subsecoes'][subsecao] = []
+                print(f"Nova subseção criada: '{subsecao}' na seção '{secao_principal}'")
+            
+            # Adicionar o campo à subseção
+            campo_info = {
+                'id': campo_limpo,
                 'nome': nome_campo.replace('_', ' ').title()
-            })
+            }
+            secoes[secao_principal]['subsecoes'][subsecao].append(campo_info)
+            print(f"Campo '{campo_limpo}' adicionado à seção '{secao_principal}', subseção '{subsecao}'")
         else:
-            # Se não segue o padrão, colocar em "Outros"
+            print(f"Formato inválido para: '{campo_limpo}', adicionando a 'Outros'")
+            # Se não tem o formato esperado, colocar em "Outros"
             if "Outros" not in secoes:
-                secoes["Outros"] = []
+                secoes["Outros"] = {
+                    'campos': [],
+                    'subsecoes': {}
+                }
                 secoes_ordem.append("Outros")  # Adiciona "Outros" à lista de ordem
+                print("Seção 'Outros' criada")
             
-            secoes["Outros"].append({
-                'id': campo,
-                'nome': campo.replace('_', ' ').title()
-            })
+            # Adicionar o campo à seção "Outros"
+            campo_info = {
+                'id': campo_limpo,
+                'nome': campo_limpo.replace('_', ' ').title()
+            }
+            secoes["Outros"]['campos'].append(campo_info)
+            print(f"Campo '{campo_limpo}' adicionado à seção 'Outros'")
     
     # Formatar nomes das seções para exibição, preservando a ordem
     secoes_formatadas = {}
     for secao in secoes_ordem:  # Usa a lista de ordem em vez de iterar pelo dicionário
-        nome_secao = secao.replace('_', ' ').title()
-        secoes_formatadas[nome_secao] = secoes[secao]
+        # Função auxiliar para formatar nomes mantendo números
+        def formatar_nome(nome):
+            # Primeiro, separar letras e números (ex: 'tanque1' -> 'tanque 1')
+            nome_formatado = ''
+            for i, char in enumerate(nome):
+                if i > 0 and char.isdigit() and nome[i-1].isalpha():
+                    nome_formatado += ' ' + char
+                else:
+                    nome_formatado += char
+            # Depois, substituir underscores por espaços e capitalizar
+            return nome_formatado.replace('_', ' ').title()
+        
+        # Formatar o nome da seção para exibição
+        nome_secao = formatar_nome(secao)
+        print(f"Formatando seção '{secao}' como '{nome_secao}'")
+        
+        # Formatar nomes das subseções
+        subsecoes_formatadas = {}
+        for subsecao, campos in secoes[secao]['subsecoes'].items():
+            # Formatar o nome da subseção para exibição
+            nome_subsecao = formatar_nome(subsecao)
+            subsecoes_formatadas[nome_subsecao] = campos
+            print(f"  Formatando subseção '{subsecao}' como '{nome_subsecao}' com {len(campos)} campos")
+        
+        secoes_formatadas[nome_secao] = {
+            'campos': secoes[secao]['campos'],
+            'subsecoes': subsecoes_formatadas
+        }
+    
+    # Imprimir estrutura final para debug
+    print("\nEstrutura final das seções:")
+    for secao, info in secoes_formatadas.items():
+        print(f"Seção: '{secao}' com {len(info['campos'])} campos principais e {len(info['subsecoes'])} subseções")
+        for subsecao, campos in info['subsecoes'].items():
+            print(f"  Subseção: '{subsecao}' com {len(campos)} campos")
+            for campo in campos:
+                print(f"    Campo: id='{campo['id']}', nome='{campo['nome']}'")
+    
+    return secoes_formatadas
+    
+    # Formatar nomes das seções para exibição, preservando a ordem
+    secoes_formatadas = {}
+    for secao in secoes_ordem:  # Usa a lista de ordem em vez de iterar pelo dicionário
+        # Formatar o nome da seção para exibição, mantendo números
+        # Exemplo: 'tanque1' -> 'Tanque 1'
+        nome_secao = re.sub(r'([a-zA-Z])([0-9])', r'\1 \2', secao)
+        nome_secao = nome_secao.replace('_', ' ').title()
+        
+        # Formatar nomes das subseções
+        subsecoes_formatadas = {}
+        for subsecao, campos in secoes[secao]['subsecoes'].items():
+            # Formatar o nome da subseção para exibição, mantendo números
+            # Exemplo: 'processo1' -> 'Processo 1'
+            nome_subsecao = re.sub(r'([a-zA-Z])([0-9])', r'\1 \2', subsecao)
+            nome_subsecao = nome_subsecao.replace('_', ' ').title()
+            subsecoes_formatadas[nome_subsecao] = campos
+        
+        secoes_formatadas[nome_secao] = {
+            'campos': secoes[secao]['campos'],
+            'subsecoes': subsecoes_formatadas
+        }
     
     return secoes_formatadas
 
@@ -99,13 +188,21 @@ def extrair_campos_em_ordem(docx_path):
                 if end_idx == -1:
                     break
                     
-                # Extrair o nome do campo
+                # Extrair o nome do campo e remover apenas espaços no início e fim
                 campo = text[start_idx+2:end_idx].strip()
+                # Remover espaços extras que possam estar dentro do campo, mas preservar a estrutura
+                campo = re.sub(r'\s+', '', campo)
+                
+                # Imprimir para debug
+                print(f"Campo extraído: '{campo}'")
+                
                 if campo and campo not in campos_ordenados:
                     campos_ordenados.append(campo)
                     
                 start_idx = end_idx + 2
     
+    # Imprimir todos os campos encontrados para debug
+    print("Todos os campos encontrados:", campos_ordenados)
     return campos_ordenados
 
 # Modifique a função upload_template para usar a nova função
@@ -281,8 +378,13 @@ def generate_document():
 def download_file(filename):
     return send_from_directory(app.config['OUTPUT_FOLDER'], filename, as_attachment=True)
 
+@app.route('/download-redigido')
+def download_redigido():
+    # Caminho para o arquivo redigido.docx na pasta certo
+    return send_from_directory('certo', 'redigido.docx', as_attachment=True)
+
 # Modificar a parte final do arquivo
 if __name__ == '__main__':
     # Usar variáveis de ambiente para configuração em produção
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=True)

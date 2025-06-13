@@ -210,4 +210,127 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+    
+    // Adicionar botões para duplicar seções
+    const accordionItems = document.querySelectorAll('.accordion-item');
+    accordionItems.forEach((item, index) => {
+        // Não adicionar botão de duplicar na última seção
+        if (index < accordionItems.length - 1) {
+            const headerButton = item.querySelector('.accordion-button');
+            const collapseDiv = item.querySelector('.accordion-collapse');
+            
+            // Criar botão de duplicar seção
+            const duplicateBtn = document.createElement('button');
+            duplicateBtn.type = 'button';
+            duplicateBtn.className = 'btn btn-outline-primary btn-sm duplicate-section-btn mt-3 mb-3';
+            duplicateBtn.innerHTML = '<i class="bi bi-files me-2"></i>Duplicar para Seção Abaixo';
+            duplicateBtn.setAttribute('data-current-section', index);
+            duplicateBtn.setAttribute('data-target-section', index + 1);
+            
+            // Adicionar botão ao final da seção
+            collapseDiv.appendChild(duplicateBtn);
+            
+            // Adicionar event listener para o botão de duplicar
+            duplicateBtn.addEventListener('click', function() {
+                const currentSectionIndex = parseInt(this.getAttribute('data-current-section'));
+                const targetSectionIndex = parseInt(this.getAttribute('data-target-section'));
+                
+                // Obter a seção atual e a seção alvo
+                const currentSection = accordionItems[currentSectionIndex];
+                const targetSection = accordionItems[targetSectionIndex];
+                
+                // Duplicar campos normais
+                const currentInputs = currentSection.querySelectorAll('input[type="text"]:not(.campo-dinamico input)');
+                const targetInputs = targetSection.querySelectorAll('input[type="text"]:not(.campo-dinamico input)');
+                
+                // Copiar valores dos campos normais
+                currentInputs.forEach((input, i) => {
+                    if (i < targetInputs.length) {
+                        targetInputs[i].value = input.value;
+                        // Adicionar classe is-valid se o campo tiver valor
+                        if (input.value.trim() !== '') {
+                            targetInputs[i].classList.add('is-valid');
+                        }
+                    }
+                });
+                
+                // Duplicar campos dinâmicos
+                const currentDinamicos = currentSection.querySelectorAll('.campo-dinamico');
+                const targetDinamicosContainer = targetSection.querySelector('[id^="campos-dinamicos-"]');
+                
+                // Limpar campos dinâmicos existentes na seção alvo
+                targetDinamicosContainer.innerHTML = '';
+                
+                // Copiar campos dinâmicos
+                currentDinamicos.forEach(campo => {
+                    // Obter valores do campo dinâmico atual
+                    const nomeCampo = campo.querySelector('input[name^="dinamico_nome_"]').value;
+                    const valorCampo = campo.querySelector('input[id^=""]').value;
+                    const campoIdOriginal = campo.querySelector('input[name="campos_dinamicos[]"]').value;
+                    
+                    // Criar novo ID para o campo duplicado
+                    const secaoAlvo = targetSection.querySelector('.accordion-button').getAttribute('data-bs-target').replace('#collapse', '');
+                    const secaoNome = targetSection.querySelector('.accordion-button').textContent.trim();
+                    const campoId = `${secaoNome.replace(/\s+/g, '_').toLowerCase()}_dinamico_${campoCounter}`;
+                    campoCounter++;
+                    
+                    // Criar novo campo dinâmico
+                    const novoCampo = document.createElement('div');
+                    novoCampo.className = 'col-md-6 mb-3 campo-dinamico';
+                    novoCampo.innerHTML = `
+                        <div class="d-flex">
+                            <div class="flex-grow-1">
+                                <input type="text" class="form-control mb-2" 
+                                       placeholder="Nome do Campo" 
+                                       name="dinamico_nome_${campoId}" 
+                                       value="${nomeCampo}">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-pencil-fill"></i></span>
+                                    <input type="text" class="form-control" 
+                                           placeholder="Valor" 
+                                           id="${campoId}" 
+                                           name="${campoId}" 
+                                           value="${valorCampo}">
+                                    <input type="hidden" name="campos_dinamicos[]" value="${campoId}">
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger ms-2 remove-campo-btn" 
+                                    style="height: 38px; align-self: flex-end;">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Adicionar o novo campo ao container da seção alvo
+                    targetDinamicosContainer.appendChild(novoCampo);
+                    
+                    // Adicionar event listener para o botão de remover
+                    const removeBtn = novoCampo.querySelector('.remove-campo-btn');
+                    removeBtn.addEventListener('click', function() {
+                        novoCampo.remove();
+                    });
+                });
+                
+                // Expandir a seção alvo para mostrar os campos duplicados
+                const targetButton = targetSection.querySelector('.accordion-button');
+                if (targetButton.classList.contains('collapsed')) {
+                    targetButton.click();
+                }
+                
+                // Mostrar mensagem de sucesso
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+                alertDiv.innerHTML = `
+                    <strong>Sucesso!</strong> Campos duplicados para a seção abaixo.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                currentSection.appendChild(alertDiv);
+                
+                // Remover alerta após 3 segundos
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 3000);
+            });
+        }
+    });
 });

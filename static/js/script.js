@@ -139,7 +139,6 @@ document.head.appendChild(styleSection);
 
 
 // Adicionar ao final do arquivo script.js
-// Adicionar ao final do arquivo script.js
 document.addEventListener('DOMContentLoaded', function() {
     // Validar formulário antes do envio
     const form = document.querySelector('form[action="/generate"]');
@@ -153,6 +152,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+    }
+    
+    // Inicializar modais do Bootstrap para garantir que funcionem corretamente
+    // Isso é especialmente importante para os modais de exclusão no histórico
+    const deleteButtons = document.querySelectorAll('[data-bs-toggle="modal"]');
+    if (deleteButtons.length > 0) {
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const modalId = this.getAttribute('data-bs-target');
+                const modalElement = document.querySelector(modalId);
+                if (modalElement) {
+                    const modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                }
+            });
+        });
+        console.log('Botões de exclusão inicializados:', deleteButtons.length);
     }
 });
 

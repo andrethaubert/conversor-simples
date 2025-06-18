@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, session, jsonify
 from docxtpl import DocxTemplate
 import os
 import json
@@ -7,12 +7,25 @@ from werkzeug.utils import secure_filename
 import zipfile
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from datetime import datetime
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente do arquivo .env
+load_dotenv()
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'output'
 app.config['ALLOWED_EXTENSIONS'] = {'docx'}
+app.secret_key = os.getenv('SECRET_KEY', 'chave_secreta_padrao')
 
+# Configuração do MongoDB
+mongo_uri = os.getenv('MONGODB_URI')
+client = MongoClient(mongo_uri)
+db = client['orcamentos_db']
+orcamentos_collection = db['orcamentos']
 
 for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
     if not os.path.exists(folder):
@@ -24,6 +37,24 @@ def allowed_file(filename):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/novo-orcamento')
+def novo_orcamento():
+    # Limpar qualquer sessão anterior
+    session.pop('orcamento_id', None)
+    return render_template('index.html')
+
+@app.route('/historico')
+def historico():
+    # Buscar todos os orçamentos salvos no MongoDB
+    orcamentos = list(orcamentos_collection.find().sort('data_criacao', -1))
+    
+    # Formatar a data para exibição
+    for orcamento in orcamentos:
+        if 'data_criacao' in orcamento:
+            orcamento['data_criacao'] = orcamento['data_criacao'].strftime('%d/%m/%Y %H:%M')
+    
+    return render_template('historico.html', orcamentos=orcamentos)
 
 def organizar_campos_por_secao(campos):
     """Organiza os campos em seções e subseções com base em prefixos ou padrões, preservando a ordem original."""
@@ -254,6 +285,55 @@ def selecionar_secoes():
             
         secoes = organizar_campos_por_secao(campos)
         
+        # Salvar as seções selecionadas no MongoDB mesmo sem preencher os campos
+        if secoes_selecionadas:
+            # Verificar se já existe um orçamento em andamento
+            orcamento_id = session.get('orcamento_id')
+            
+            # Inicializar um contexto vazio para os campos
+            context = {}
+            
+            # Inicializar uma lista vazia para campos dinâmicos
+            campos_dinamicos = []
+            
+            # Preparar dados para salvar
+            orcamento_data = {
+                'nome': 'Orçamento em andamento',  # Nome temporário
+                'numero': 'Temporário',  # Número temporário
+                'template_name': template_name,
+                'secoes_selecionadas': secoes_selecionadas,
+                'context': context,  # Adicionar contexto vazio
+                'campos_dinamicos': campos_dinamicos,  # Adicionar campos dinâmicos vazios
+                'data_criacao': datetime.now()
+            }
+            
+            # Se estamos atualizando um orçamento existente
+            if orcamento_id:
+                # Buscar o orçamento existente para preservar dados já preenchidos
+                orcamento_existente = orcamentos_collection.find_one({'_id': ObjectId(orcamento_id)})
+                if orcamento_existente:
+                    # Manter o contexto existente
+                    if 'context' in orcamento_existente:
+                        orcamento_data['context'] = orcamento_existente.get('context', {})
+                    
+                    # Manter os campos dinâmicos existentes
+                    if 'campos_dinamicos' in orcamento_existente:
+                        orcamento_data['campos_dinamicos'] = orcamento_existente.get('campos_dinamicos', [])
+                
+                # Atualizar o orçamento
+                orcamentos_collection.update_one(
+                    {'_id': ObjectId(orcamento_id)},
+                    {'$set': orcamento_data}
+                )
+            else:
+                # Inserir novo orçamento
+                result = orcamentos_collection.insert_one(orcamento_data)
+                orcamento_id = str(result.inserted_id)
+                session['orcamento_id'] = orcamento_id
+            
+            print(f"Seções selecionadas salvas no MongoDB: {secoes_selecionadas}")
+            print(f"Orçamento salvo com ID: {orcamento_id}")
+        
         return render_template('index.html', 
                               template_name=template_name,
                               secoes=secoes,
@@ -292,13 +372,24 @@ def generate_document():
     if not template_name:
         return redirect(url_for('index'))
     
+    # Verificar se estamos continuando um orçamento existente
+    orcamento_id = session.get('orcamento_id')
+    
     # Obter todos os campos do formulário
     context = {}
     campos_dinamicos_dict = []  # Lista para campos dinâmicos
     campos_dinamicos = request.form.getlist('campos_dinamicos[]')
+    secoes_selecionadas = request.form.getlist('secoes_selecionadas')
+    
+    # Obter nome e número do orçamento, se fornecidos
+    nome_orcamento = request.form.get('nome_orcamento', '')
+    numero_orcamento = request.form.get('numero_orcamento', '')
+    
+    # Determinar se devemos salvar o orçamento
+    salvar_orcamento = request.form.get('salvar_orcamento') == 'true'
     
     for key, value in request.form.items():
-        if key != 'template_name' and key != 'campos_dinamicos[]':
+        if key not in ['template_name', 'campos_dinamicos[]', 'salvar_orcamento', 'nome_orcamento', 'numero_orcamento']:
             # Processar nomes de campos dinâmicos
             if key.startswith('dinamico_nome_'):
                 continue  # Pular, processaremos junto com os valores
@@ -371,8 +462,47 @@ def generate_document():
     output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
     doc.save(output_path)
     
+    # Se for para salvar o orçamento, salvar no MongoDB
+    if salvar_orcamento and nome_orcamento and numero_orcamento:
+        # Preparar dados para salvar
+        orcamento_data = {
+            'nome': nome_orcamento,
+            'numero': numero_orcamento,
+            'template_name': template_name,
+            'context': context,
+            'secoes_selecionadas': secoes_selecionadas,
+            'data_criacao': datetime.now()
+        }
+        
+        # Se estamos atualizando um orçamento existente
+        if orcamento_id:
+            orcamentos_collection.update_one(
+                {'_id': ObjectId(orcamento_id)},
+                {'$set': orcamento_data}
+            )
+        else:
+            # Inserir novo orçamento
+            result = orcamentos_collection.insert_one(orcamento_data)
+            orcamento_id = str(result.inserted_id)
+            session['orcamento_id'] = orcamento_id
+    else:
+        # Mesmo que o usuário não tenha escolhido salvar o orçamento completo,
+        # vamos salvar as seções selecionadas para que possam ser recuperadas depois
+        if orcamento_id:
+            # Atualizar apenas as seções selecionadas no orçamento existente
+            orcamentos_collection.update_one(
+                {'_id': ObjectId(orcamento_id)},
+                {'$set': {
+                    'secoes_selecionadas': secoes_selecionadas,
+                    'context': context
+                }}
+            )
+            print(f"Seções selecionadas atualizadas no MongoDB: {secoes_selecionadas}")
+        
     return render_template('success.html', 
-                          filename=output_filename)
+                          filename=output_filename,
+                          orcamento_salvo=salvar_orcamento,
+                          orcamento_id=orcamento_id)
 
 @app.route('/download/<filename>')
 def download_file(filename):
@@ -382,6 +512,182 @@ def download_file(filename):
 def download_redigido():
     # Caminho para o arquivo redigido.docx na pasta certo
     return send_from_directory('certo', 'redigido.docx', as_attachment=True)
+
+@app.route('/continuar-orcamento/<orcamento_id>')
+def continuar_orcamento(orcamento_id):
+    # Buscar o orçamento no MongoDB
+    orcamento = orcamentos_collection.find_one({'_id': ObjectId(orcamento_id)})
+    
+    if not orcamento:
+        return redirect(url_for('historico'))
+    
+    # Salvar o ID do orçamento na sessão
+    session['orcamento_id'] = orcamento_id
+    
+    # Obter o template e os campos
+    template_name = orcamento.get('template_name')
+    template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
+    
+    # Verificar se o template existe
+    if not os.path.exists(template_path):
+        return render_template('error.html', 
+                              error=f"O template '{template_name}' não foi encontrado. "
+                                    "Por favor, faça upload do template novamente.", 
+                              filename="")
+    
+    # Extrair campos do template
+    campos = extrair_campos_em_ordem(template_path)
+    if not campos:
+        doc = DocxTemplate(template_path)
+        campos = list(doc.get_undeclared_template_variables())
+    
+    # Organizar campos em seções
+    secoes = organizar_campos_por_secao(campos)
+    
+    # Obter as seções selecionadas do orçamento salvo
+    secoes_selecionadas = orcamento.get('secoes_selecionadas', [])
+    
+    # Garantir que secoes_selecionadas não seja None
+    if secoes_selecionadas is None:
+        secoes_selecionadas = []
+        print("AVISO: secoes_selecionadas era None, inicializado como lista vazia")
+    
+    # Obter o contexto (valores dos campos)
+    context = orcamento.get('context', {})
+    
+    # Garantir que context não seja None
+    if context is None:
+        context = {}
+        print("AVISO: context era None, inicializado como dicionário vazio")
+    
+    # Imprimir informações para debug
+    print(f"Continuando orçamento: {orcamento_id}")
+    print(f"Template: {template_name}")
+    print(f"Seções selecionadas: {secoes_selecionadas}")
+    print(f"Contexto: {context}")
+    print(f"Seções disponíveis: {list(secoes.keys())}")
+    
+    # Verificar se as seções selecionadas estão nas seções disponíveis
+    # Se não estiverem, pode ser um problema de formatação
+    secoes_disponiveis = list(secoes.keys())
+    secoes_selecionadas_encontradas = []
+    
+    # Criar um mapeamento case-insensitive para as seções disponíveis
+    mapa_secoes_case_insensitive = {secao.lower(): secao for secao in secoes_disponiveis}
+    print(f"Mapa de seções case-insensitive: {mapa_secoes_case_insensitive}")
+    
+    for secao_selecionada in secoes_selecionadas:
+        if secao_selecionada in secoes_disponiveis:
+            # Seção encontrada diretamente
+            secoes_selecionadas_encontradas.append(secao_selecionada)
+            print(f"Seção '{secao_selecionada}' encontrada diretamente")
+        elif secao_selecionada.lower() in mapa_secoes_case_insensitive:
+            # Seção encontrada por case-insensitive
+            secao_correta = mapa_secoes_case_insensitive[secao_selecionada.lower()]
+            secoes_selecionadas_encontradas.append(secao_correta)
+            print(f"Seção '{secao_selecionada}' encontrada por case-insensitive como '{secao_correta}'")
+        else:
+            # Seção não encontrada
+            print(f"AVISO: Seção '{secao_selecionada}' não encontrada em nenhuma forma")
+    
+    # MODIFICAÇÃO: Usar todas as seções disponíveis em vez de apenas as selecionadas
+    # Isso permitirá que o usuário veja todas as seções do documento, incluindo as não preenchidas
+    secoes_selecionadas = secoes_disponiveis
+    print(f"Mostrando todas as seções disponíveis: {secoes_selecionadas}")
+    
+    # Atualizar o orçamento no MongoDB com todas as seções
+    orcamentos_collection.update_one(
+        {'_id': ObjectId(orcamento_id)},
+            {'$set': {'secoes_selecionadas': secoes_selecionadas}}
+        )
+    print(f"Seções selecionadas atualizadas no MongoDB: {secoes_selecionadas}")
+        
+    # Extrair campos dinâmicos do contexto ou diretamente do orçamento
+    campos_dinamicos = []
+    
+    # Verificar se há campos dinâmicos no contexto
+    if context and 'campos_dinamicos' in context and context['campos_dinamicos'] is not None:
+        print(f"Campos dinâmicos encontrados no contexto: {context['campos_dinamicos']}")
+        campos_dinamicos = context['campos_dinamicos']
+    # Verificar se há campos dinâmicos diretamente no orçamento
+    elif 'campos_dinamicos' in orcamento and orcamento['campos_dinamicos'] is not None:
+        print(f"Campos dinâmicos encontrados diretamente no orçamento: {orcamento['campos_dinamicos']}")
+        campos_dinamicos = orcamento['campos_dinamicos']
+    else:
+        print("Nenhum campo dinâmico encontrado, inicializando como lista vazia")
+    
+    # Garantir que campos_dinamicos não seja None
+    if campos_dinamicos is None:
+        campos_dinamicos = []
+        print("AVISO: campos_dinamicos era None, inicializado como lista vazia")
+    
+    return render_template('index.html', 
+                          template_name=template_name,
+                          secoes=secoes,
+                          secoes_selecionadas=secoes_selecionadas,
+                          context=context,
+                          orcamento=orcamento,
+                          orcamento_id=orcamento_id,
+                          campos_dinamicos=campos_dinamicos)
+
+@app.route('/download-orcamento/<orcamento_id>')
+def download_orcamento(orcamento_id):
+    # Buscar o orçamento no MongoDB
+    orcamento = orcamentos_collection.find_one({'_id': ObjectId(orcamento_id)})
+    
+    if not orcamento:
+        return redirect(url_for('historico'))
+    
+    # Obter o template e o contexto
+    template_name = orcamento.get('template_name')
+    context = orcamento.get('context', {})
+    
+    template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
+    
+    # Verificar se o template existe
+    if not os.path.exists(template_path):
+        # Verificar se existe um arquivo com nome similar na pasta de uploads
+        uploads_dir = app.config['UPLOAD_FOLDER']
+        arquivos_disponiveis = os.listdir(uploads_dir)
+        
+        # Tentar encontrar um arquivo com nome similar
+        for arquivo in arquivos_disponiveis:
+            if arquivo.endswith('.docx'):
+                template_path = os.path.join(uploads_dir, arquivo)
+                print(f"Template original não encontrado. Usando template alternativo: {arquivo}")
+                break
+        else:
+            # Se não encontrar nenhum template alternativo
+            return render_template('error.html', 
+                                  error=f"O template '{template_name}' não foi encontrado e nenhum template alternativo está disponível. "
+                                    "Por favor, faça upload do template novamente.", 
+                              filename="")
+    
+    # Gerar o documento
+    doc = DocxTemplate(template_path)
+    
+    try:
+        doc.render(context)
+    except Exception as e:
+        return render_template('error.html', error=str(e), filename="")
+    
+    # Nome do arquivo de saída
+    output_filename = f"preenchido_{orcamento.get('nome')}_{orcamento.get('numero')}.docx"
+    output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
+    doc.save(output_path)
+    
+    return send_from_directory(app.config['OUTPUT_FOLDER'], output_filename, as_attachment=True)
+
+@app.route('/excluir-orcamento/<orcamento_id>')
+def excluir_orcamento(orcamento_id):
+    # Excluir o orçamento do MongoDB
+    orcamentos_collection.delete_one({'_id': ObjectId(orcamento_id)})
+    
+    # Se o orçamento excluído for o que está na sessão, limpar a sessão
+    if session.get('orcamento_id') == orcamento_id:
+        session.pop('orcamento_id', None)
+    
+    return redirect(url_for('historico'))
 
 # Modificar a parte final do arquivo
 if __name__ == '__main__':

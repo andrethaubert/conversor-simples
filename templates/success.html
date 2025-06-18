@@ -25,20 +25,74 @@
                             <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
                         </div>
                         <p class="lead mb-4">Seu documento foi preenchido e está pronto para download.</p>
-                        <div class="d-flex justify-content-center gap-3">
-                            <!-- Substitua a linha 29 por: -->
+                        
+                        {% if orcamento_salvo %}
+                        <div class="alert alert-success mb-4">
+                            <i class="bi bi-save me-2"></i> Seu orçamento foi salvo com sucesso!
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-center gap-3 mb-4">
                             {% if filename %}
                             <a href="{{ url_for('download_file', filename=filename) }}" class="btn btn-primary btn-lg">
                                 <i class="bi bi-download me-2"></i> Baixar Documento
                             </a>
-                            {% else %}
-                            <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                            {% endif %}
+                            
+                            {% if not orcamento_salvo %}
+                            <button type="button" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#saveModal">
+                                <i class="bi bi-save me-2"></i> Salvar Orçamento
+                            </button>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-flex justify-content-center gap-3">
+                            <a href="{{ url_for('index') }}" class="btn btn-secondary">
                                 <i class="bi bi-house-door me-2"></i> Voltar ao Início
                             </a>
-                            {% endif %}
+                            <a href="{{ url_for('historico') }}" class="btn btn-info">
+                                <i class="bi bi-clock-history me-2"></i> Ver Histórico
+                            </a>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para salvar orçamento -->
+    <div class="modal fade" id="saveModal" tabindex="-1" aria-labelledby="saveModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saveModalLabel">Salvar Orçamento</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="saveForm" method="post" action="{{ url_for('generate_document') }}">
+                    <div class="modal-body">
+                        <p>Preencha as informações abaixo para salvar seu orçamento:</p>
+                        <div class="mb-3">
+                            <label for="nome_orcamento" class="form-label">Nome do Orçamento</label>
+                            <input type="text" class="form-control" id="nome_orcamento" name="nome_orcamento" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="numero_orcamento" class="form-label">Número do Orçamento</label>
+                            <input type="text" class="form-control" id="numero_orcamento" name="numero_orcamento" required>
+                        </div>
+                        <input type="hidden" name="template_name" value="{{ filename.replace('preenchido_', '') }}">
+                        <input type="hidden" name="salvar_orcamento" value="true">
+                        <!-- Campos ocultos para manter o estado do formulário -->
+                        {% for key, value in request.form.items() %}
+                            {% if key != 'template_name' and key != 'salvar_orcamento' %}
+                                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success">Salvar</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

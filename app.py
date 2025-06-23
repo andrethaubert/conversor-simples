@@ -358,6 +358,67 @@ def selecionar_secoes():
                               template_name=template_name,
                               secoes=secoes)
 
+# Rota para salvar orçamento na etapa de seleção de seções
+@app.route('/salvar_orcamento_secoes', methods=['POST'])
+def salvar_orcamento_secoes():
+    try:
+        template_name = request.form.get('template_name')
+        secoes_selecionadas = request.form.getlist('secoes_selecionadas')
+        
+        if not template_name or not secoes_selecionadas:
+            return jsonify({'success': False, 'error': 'Template ou seções não fornecidos'})
+        
+        # Verificar se já existe um orçamento em andamento
+        orcamento_id = session.get('orcamento_id')
+        
+        # Inicializar um contexto vazio para os campos
+        context = {}
+        
+        # Inicializar uma lista vazia para campos dinâmicos
+        campos_dinamicos = []
+        
+        # Preparar dados para salvar
+        orcamento_data = {
+            'nome': 'Orçamento salvo',  # Nome temporário
+            'numero': 'Temporário',  # Número temporário
+            'template_name': template_name,
+            'secoes_selecionadas': secoes_selecionadas,
+            'context': context,  # Adicionar contexto vazio
+            'campos_dinamicos': campos_dinamicos,  # Adicionar campos dinâmicos vazios
+            'data_criacao': datetime.now()
+        }
+        
+        # Se estamos atualizando um orçamento existente
+        if orcamento_id:
+            # Buscar o orçamento existente para preservar dados já preenchidos
+            orcamento_existente = orcamentos_collection.find_one({'_id': ObjectId(orcamento_id)})
+            if orcamento_existente:
+                # Manter o contexto existente
+                if 'context' in orcamento_existente:
+                    orcamento_data['context'] = orcamento_existente.get('context', {})
+                
+                # Manter os campos dinâmicos existentes
+                if 'campos_dinamicos' in orcamento_existente:
+                    orcamento_data['campos_dinamicos'] = orcamento_existente.get('campos_dinamicos', [])
+            
+            # Atualizar o orçamento
+            orcamentos_collection.update_one(
+                {'_id': ObjectId(orcamento_id)},
+                {'$set': orcamento_data}
+            )
+            print(f"Orçamento atualizado com ID: {orcamento_id}")
+        else:
+            # Inserir novo orçamento
+            result = orcamentos_collection.insert_one(orcamento_data)
+            orcamento_id = str(result.inserted_id)
+            session['orcamento_id'] = orcamento_id
+            print(f"Novo orçamento salvo com ID: {orcamento_id}")
+        
+        return jsonify({'success': True, 'orcamento_id': orcamento_id})
+    except Exception as e:
+        print(f"Erro ao salvar orçamento: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
 # Adicionar esta função antes de generate_document
 def sanitizar_valor(valor):
     """Sanitiza valores para evitar erros de sintaxe Jinja2"""
@@ -678,16 +739,33 @@ def download_orcamento(orcamento_id):
     
     return send_from_directory(app.config['OUTPUT_FOLDER'], output_filename, as_attachment=True)
 
-@app.route('/excluir-orcamento/<orcamento_id>')
+@app.route('/excluir-orcamento/<orcamento_id>', methods=['GET', 'POST'])
 def excluir_orcamento(orcamento_id):
-    # Excluir o orçamento do MongoDB
-    orcamentos_collection.delete_one({'_id': ObjectId(orcamento_id)})
-    
-    # Se o orçamento excluído for o que está na sessão, limpar a sessão
-    if session.get('orcamento_id') == orcamento_id:
-        session.pop('orcamento_id', None)
-    
-    return redirect(url_for('historico'))
+    try:
+        # Imprimir informações para debug
+        print(f"Tentando excluir orçamento com ID: {orcamento_id}")
+        
+        # Excluir o orçamento do MongoDB
+        resultado = orcamentos_collection.delete_one({'_id': ObjectId(orcamento_id)})
+        print(f"Resultado da exclusão: {resultado.deleted_count} documento(s) excluído(s)")
+        
+        # Se o orçamento excluído for o que está na sessão, limpar a sessão
+        if session.get('orcamento_id') == orcamento_id:
+            session.pop('orcamento_id', None)
+            print("Sessão limpa após exclusão do orçamento ativo")
+        
+        # Verificar se a solicitação é AJAX
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True})
+            
+        return redirect(url_for('historico'))
+    except Exception as e:
+        print(f"Erro ao excluir orçamento: {str(e)}")
+        # Verificar se a solicitação é AJAX
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': str(e)})
+            
+        return render_template('error.html', error=f"Erro ao excluir orçamento: {str(e)}", filename="")
 
 # Modificar a parte final do arquivo
 if __name__ == '__main__':

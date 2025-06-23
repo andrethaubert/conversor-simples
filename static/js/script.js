@@ -97,7 +97,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-        
+    });
+    
         // Verificar estado inicial
         const checkbox = card.querySelector('input[type="checkbox"]');
         if (checkbox.checked) {
@@ -105,19 +106,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Atualizar aparência quando o checkbox é alterado diretamente
-    const checkboxes = document.querySelectorAll('.section-card input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const card = this.closest('.section-card');
-            if (this.checked) {
-                card.classList.add('selected-section');
-            } else {
-                card.classList.remove('selected-section');
-            }
+    document.addEventListener('DOMContentLoaded', function() { // Add this line
+        // Atualizar aparência quando o checkbox é alterado diretamente
+        const checkboxes = document.querySelectorAll('.section-card input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const card = this.closest('.section-card');
+                if (this.checked) {
+                    card.classList.add('selected-section');
+                } else {
+                    card.classList.remove('selected-section');
+                }
+            });
         });
-    });
-});
+    }); // This closing bracket now correctly matches the opening document.addEventListener
 
 // Adicionar estilo para seções selecionadas
 const styleSection = document.createElement('style');
@@ -137,12 +139,80 @@ styleSection.textContent = `
 `;
 document.head.appendChild(styleSection);
 
+// Adicionar funcionalidade ao botão de salvar orçamento na página de seleção de seções
+document.addEventListener('DOMContentLoaded', function() {
+    const salvarOrcamentoBtn = document.getElementById('salvar_orcamento_btn');
+    if (salvarOrcamentoBtn) {
+        salvarOrcamentoBtn.addEventListener('click', function() {
+            // Obter o formulário de seleção de seções
+            const form = document.querySelector('form[action*="selecionar_secoes"]');
+            if (form) {
+                // Criar um FormData com os dados do formulário
+                const formData = new FormData(form);
+                
+                // Adicionar um campo para indicar que é uma solicitação de salvamento
+                formData.append('salvar_sem_continuar', 'true');
+                
+                // Enviar solicitação AJAX para salvar o orçamento
+                fetch('/salvar_orcamento_secoes', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Mostrar mensagem de sucesso
+                        alert('Orçamento salvo com sucesso!');
+                    } else {
+                        // Mostrar mensagem de erro
+                        alert('Erro ao salvar orçamento: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao salvar orçamento. Verifique o console para mais detalhes.');
+                });
+            }
+        });
+    }
+});
 
 // Adicionar ao final do arquivo script.js
 document.addEventListener('DOMContentLoaded', function() {
     // Validar formulário antes do envio
     const form = document.querySelector('form[action="/generate"]');
     if (form) {
+        // Adicionar event listener para o botão de salvar orçamento
+        const salvarOrcamentoBtn = document.getElementById('salvar_orcamento_btn');
+        if (salvarOrcamentoBtn) {
+            salvarOrcamentoBtn.addEventListener('click', function(event) {
+                event.preventDefault();
+                
+                // Coletar todos os dados do formulário
+                const formData = new FormData(form);
+                
+                // Enviar solicitação AJAX para salvar o orçamento
+                fetch('/salvar_orcamento_secoes', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Mostrar mensagem de sucesso
+                        alert('Orçamento salvo com sucesso!');
+                    } else {
+                        // Mostrar mensagem de erro
+                        alert('Erro ao salvar orçamento: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao salvar orçamento. Verifique o console para mais detalhes.');
+                });
+            });
+        }
+        
         form.addEventListener('submit', function(event) {
             // Impedir que a tecla Enter envie o formulário
             document.addEventListener('keypress', function(e) {
@@ -281,7 +351,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentDinamicos.forEach(campo => {
                     // Obter valores do campo dinâmico atual
                     const nomeCampo = campo.querySelector('input[name^="dinamico_nome_"]').value;
-                    const valorCampo = campo.querySelector('input[id^=""]').value;
+                    const valorCampo = campo.querySelector('.input-group input[type="text"]').value;
                     const campoIdOriginal = campo.querySelector('input[name="campos_dinamicos[]"]').value;
                     
                     // Criar novo ID para o campo duplicado

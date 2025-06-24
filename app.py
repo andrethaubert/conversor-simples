@@ -28,7 +28,7 @@ if not mongo_uri:
     raise ValueError("A variável de ambiente MONGODB_URI não está definida. Por favor, configure-a no seu ambiente de deploy (Render, Heroku, etc.).")
 
 # Voltando para a abordagem mais simples e canônica que não causa erro de configuração
-client = MongoClient(mongo_uri, tls=True, tls_ca_file=certifi.where())
+client = MongoClient(mongo_uri, tls=True, tlscafile=certifi.where())
 db = client['orcamentos_db']
 orcamentos_collection = db['orcamentos']
 

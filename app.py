@@ -31,7 +31,7 @@ if not mongo_uri:
 # Criar um contexto SSL que usa os certificados do certifi
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
-client = MongoClient(mongo_uri, tls=True, tlsContext=ssl_context)
+client = MongoClient(mongo_uri, tls=True, tls_context=ssl_context)
 db = client['orcamentos_db']
 orcamentos_collection = db['orcamentos']
 

@@ -12,6 +12,7 @@ from bson.objectid import ObjectId
 from datetime import datetime
 from dotenv import load_dotenv
 import certifi
+import ssl
 
 # Carregar variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -24,7 +25,13 @@ app.secret_key = os.getenv('SECRET_KEY', 'chave_secreta_padrao')
 
 # Configuração do MongoDB
 mongo_uri = os.getenv('MONGODB_URI')
-client = MongoClient(mongo_uri, tlsCAFile=certifi.where())
+if not mongo_uri:
+    raise ValueError("A variável de ambiente MONGODB_URI não está definida. Por favor, configure-a no seu ambiente de deploy (Render, Heroku, etc.).")
+
+# Criar um contexto SSL que usa os certificados do certifi
+ssl_context = ssl.create_default_context(cafile=certifi.where())
+
+client = MongoClient(mongo_uri, tls=True, tlsContext=ssl_context)
 db = client['orcamentos_db']
 orcamentos_collection = db['orcamentos']
 

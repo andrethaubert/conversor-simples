@@ -2,6 +2,6 @@ flask==2.3.3
 docxtpl==0.16.7
 Werkzeug==2.3.7
 gunicorn==21.2.0
-pymongo[srv]==4.6.1
-python-dotenv==1.0.0
-certifi==2024.2.2
+pymongo[srv]==4.8.0
+python-dotenv==1.0.1
+certifi==2024.7.4

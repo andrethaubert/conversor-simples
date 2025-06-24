@@ -23,7 +23,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'chave_secreta_padrao')
 
 # Configuração do MongoDB
 mongo_uri = os.getenv('MONGODB_URI')
-client = MongoClient(mongo_uri)
+client = MongoClient("mongodb+srv://sowlmkt:P90ZBDgvgM3r6FuI@easy-project.chatakh.mongodb.net/?retryWrites=true&w=majority&appName=easy-project")
 db = client['orcamentos_db']
 orcamentos_collection = db['orcamentos']
 
@@ -704,7 +704,7 @@ def download_orcamento(orcamento_id):
     context = orcamento.get('context', {})
     
     template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
-    
+        
     # Verificar se o template existe
     if not os.path.exists(template_path):
         # Verificar se existe um arquivo com nome similar na pasta de uploads

@@ -31,6 +31,7 @@ if not mongo_uri:
 client = MongoClient(mongo_uri, tls=True, tlscafile=certifi.where())
 db = client['orcamentos_db']
 orcamentos_collection = db['orcamentos']
+templates_collection = db['templates']
 
 for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
     if not os.path.exists(folder):
@@ -254,7 +255,15 @@ def upload_template():
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file_content = file.read()
+        file.seek(0)  # Volta o ponteiro para salvar em disco
         file.save(filepath)
+        # Salvar o template no MongoDB
+        templates_collection.update_one(
+            {'filename': filename},
+            {'$set': {'filename': filename, 'content': file_content}},
+            upsert=True
+        )
         
         # Extrair campos do template na ordem em que aparecem
         campos = extrair_campos_em_ordem(filepath)
@@ -596,10 +605,15 @@ def continuar_orcamento(orcamento_id):
     
     # Verificar se o template existe
     if not os.path.exists(template_path):
-        return render_template('error.html', 
-                              error=f"O template '{template_name}' não foi encontrado. "
-                                    "Por favor, faça upload do template novamente.", 
-                              filename="")
+        # Tentar recuperar do banco
+        template_doc = templates_collection.find_one({'filename': template_name})
+        if template_doc and 'content' in template_doc:
+            with open(template_path, 'wb') as f:
+                f.write(template_doc['content'])
+        else:
+            return render_template('error.html', 
+                                  error=f"O template '{template_name}' não foi encontrado nem no banco. Por favor, faça upload do template novamente.", 
+                                  filename="")
     
     # Extrair campos do template
     campos = extrair_campos_em_ordem(template_path)
@@ -712,22 +726,15 @@ def download_orcamento(orcamento_id):
         
     # Verificar se o template existe
     if not os.path.exists(template_path):
-        # Verificar se existe um arquivo com nome similar na pasta de uploads
-        uploads_dir = app.config['UPLOAD_FOLDER']
-        arquivos_disponiveis = os.listdir(uploads_dir)
-        
-        # Tentar encontrar um arquivo com nome similar
-        for arquivo in arquivos_disponiveis:
-            if arquivo.endswith('.docx'):
-                template_path = os.path.join(uploads_dir, arquivo)
-                print(f"Template original não encontrado. Usando template alternativo: {arquivo}")
-                break
+        # Tentar recuperar do banco
+        template_doc = templates_collection.find_one({'filename': template_name})
+        if template_doc and 'content' in template_doc:
+            with open(template_path, 'wb') as f:
+                f.write(template_doc['content'])
         else:
-            # Se não encontrar nenhum template alternativo
             return render_template('error.html', 
-                                  error=f"O template '{template_name}' não foi encontrado e nenhum template alternativo está disponível. "
-                                    "Por favor, faça upload do template novamente.", 
-                              filename="")
+                                  error=f"O template '{template_name}' não foi encontrado nem no banco. Por favor, faça upload do template novamente.", 
+                                  filename="")
     
     # Gerar o documento
     doc = DocxTemplate(template_path)
@@ -771,6 +778,20 @@ def excluir_orcamento(orcamento_id):
             return jsonify({'success': False, 'error': str(e)})
             
         return render_template('error.html', error=f"Erro ao excluir orçamento: {str(e)}", filename="")
+
+@app.route('/duplicar-orcamento/<orcamento_id>')
+def duplicar_orcamento(orcamento_id):
+    orcamento = orcamentos_collection.find_one({'_id': ObjectId(orcamento_id)})
+    if not orcamento:
+        return redirect(url_for('historico'))
+    # Remover o _id e atualizar a data de criação
+    orcamento.pop('_id', None)
+    orcamento['data_criacao'] = datetime.now()
+    # Opcional: adicionar sufixo ao nome
+    orcamento['nome'] = f"{orcamento.get('nome', 'Orçamento')} (Cópia)"
+    # Inserir novo orçamento duplicado
+    orcamentos_collection.insert_one(orcamento)
+    return redirect(url_for('historico'))
 
 # Modificar a parte final do arquivo
 if __name__ == '__main__':

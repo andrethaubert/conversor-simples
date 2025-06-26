@@ -99,8 +99,8 @@
                                             <a href="{{ url_for('continuar_orcamento', orcamento_id=orcamento._id) }}" class="btn btn-sm btn-primary">
                                                 <i class="bi bi-arrow-right-circle me-1"></i>Continuar
                                             </a>
-                                            <a href="{{ url_for('download_orcamento', orcamento_id=orcamento._id) }}" class="btn btn-sm btn-success">
-                                                <i class="bi bi-download me-1"></i>Baixar
+                                            <a href="{{ url_for('duplicar_orcamento', orcamento_id=orcamento._id) }}" class="btn btn-sm btn-warning">
+                                                <i class="bi bi-files me-1"></i>Duplicar
                                             </a>
                                             <button type="button" class="btn btn-sm btn-danger btn-delete" 
                                                     data-id="{{ orcamento._id }}" 

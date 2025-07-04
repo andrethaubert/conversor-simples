@@ -434,3 +434,134 @@ code {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* --- Orçamento Cards --- */
+.orcamento-card {
+    background: #23272b;
+    border: 2.5px solid var(--primary-color);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(4,112,171,0.25);
+    margin-bottom: 2.5rem;
+    position: relative;
+    transition: box-shadow 0.2s, border-color 0.2s, background 0.2s;
+}
+.orcamento-card:hover {
+    box-shadow: 0 12px 40px rgba(4,112,171,0.35);
+    border-color: var(--secondary-color);
+    background: #262b31;
+}
+#orcamentos-cards .col-12, #orcamentos-cards .col-md-6, #orcamentos-cards .col-lg-4 {
+    padding-bottom: 0 !important;
+}
+/* Remover a divisória inferior anterior */
+#orcamentos-cards .orcamento-card::after {
+    display: none !important;
+}
+.orcamento-card .card-title {
+    font-size: 1.2rem;
+    color: var(--primary-color);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+.orcamento-card .card-title i {
+    color: var(--secondary-color);
+    font-size: 1.3em;
+}
+.orcamento-card p {
+    color: var(--light-text);
+    font-size: 1em;
+    margin-bottom: 0.3rem;
+}
+.orcamento-card .btn {
+    font-size: 0.98em;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s;
+    box-shadow: none;
+}
+.orcamento-card .btn-primary {
+    background: var(--primary-color);
+    border: none;
+}
+.orcamento-card .btn-warning {
+    background: var(--secondary-color);
+    border: none;
+    color: #fff;
+}
+.orcamento-card .btn-danger {
+    background: #d9534f;
+    border: none;
+}
+.orcamento-card .btn:hover, .orcamento-card .btn:focus {
+    filter: brightness(1.08);
+    transform: translateY(-2px) scale(1.04);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+@media (max-width: 991px) {
+    #orcamentos-cards .col-lg-4 { flex: 0 0 50%; max-width: 50%; }
+}
+@media (max-width: 767px) {
+    #orcamentos-cards .col-md-6, #orcamentos-cards .col-lg-4 { flex: 0 0 100%; max-width: 100%; }
+    .orcamento-card { min-height: 180px; }
+}
+
+#orcamentos-cards {
+    margin-top: 0.5rem;
+}
+#orcamentos-cards .col-12 {
+    padding-bottom: 0.5rem;
+}
+
+/* Botões de edição inline do nome */
+.btn-edit-nome, .btn-save-nome, .btn-cancel-nome {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0;
+    margin-left: 4px;
+    margin-right: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+}
+.btn-edit-nome i {
+    color: var(--secondary-color);
+    font-size: 1.15em;
+}
+.btn-edit-nome:hover i {
+    color: #fff;
+    background: var(--secondary-color);
+    border-radius: 50%;
+    padding: 3px;
+}
+.btn-save-nome i {
+    color: #28a745;
+    font-size: 1.15em;
+}
+.btn-save-nome:hover i {
+    color: #fff;
+    background: #28a745;
+    border-radius: 50%;
+    padding: 3px;
+}
+.btn-cancel-nome i {
+    color: #adb5bd;
+    font-size: 1.15em;
+}
+.btn-cancel-nome:hover i {
+    color: #fff;
+    background: #adb5bd;
+    border-radius: 50%;
+    padding: 3px;
+}
+/* Esconde o botão de editar até hover no card ou foco no input */
+.orcamento-card .btn-edit-nome {
+    opacity: 0.5;
+}
+.orcamento-card:hover .btn-edit-nome,
+.orcamento-card .orcamento-nome-input:focus + .btn-edit-nome {
+    opacity: 1;
+}

@@ -468,16 +468,19 @@ def generate_document():
             # Processar nomes de campos dinâmicos
             if key.startswith('dinamico_nome_'):
                 continue  # Pular, processaremos junto com os valores
-                
+
             # Sanitizar o valor
             value = sanitizar_valor(value)
-            
-            # Tente converter valores numéricos para float
-            if value.replace('.', '', 1).isdigit():
-                try:
-                    context[key] = float(value)
-                except ValueError:
-                    context[key] = value
+
+            # NOVO: Converter para int se for inteiro, float se for decimal, e float inteiro para int
+            if value.isdigit():
+                context[key] = int(value)
+            elif value.replace('.', '', 1).isdigit() and value.count('.') == 1:
+                num = float(value)
+                if num.is_integer():
+                    context[key] = int(num)
+                else:
+                    context[key] = num
             else:
                 context[key] = value
     
@@ -515,7 +518,14 @@ def generate_document():
     # Gerar documento
     template_path = os.path.join(app.config['UPLOAD_FOLDER'], template_name)
     doc = DocxTemplate(template_path)
-    
+
+    # --- NOVO: garantir todos os campos do template no contexto ---
+    campos_template = extrair_campos_em_ordem(template_path)
+    for campo in campos_template:
+        if campo not in context:
+            context[campo] = ''  # Preenche vazio se não veio do formulário
+    # --- FIM NOVO ---
+
     try:
         doc.render(context)
     except AttributeError as e:
@@ -792,6 +802,15 @@ def duplicar_orcamento(orcamento_id):
     # Inserir novo orçamento duplicado
     orcamentos_collection.insert_one(orcamento)
     return redirect(url_for('historico'))
+
+@app.route('/editar-nome-orcamento/<orcamento_id>', methods=['POST'])
+def editar_nome_orcamento(orcamento_id):
+    data = request.get_json()
+    novo_nome = data.get('nome', '').strip()
+    if not novo_nome:
+        return jsonify({'success': False, 'error': 'Nome inválido'})
+    orcamentos_collection.update_one({'_id': ObjectId(orcamento_id)}, {'$set': {'nome': novo_nome}})
+    return jsonify({'success': True})
 
 # Modificar a parte final do arquivo
 if __name__ == '__main__':
